@@ -1,9 +1,12 @@
 #include "SpartaCharacter.h"
 #include "SpartaPlayerController.h"
+#include "SpartaGameState.h"
 #include "EnhancedInputComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/WidgetComponent.h"
+#include "Components/TextBlock.h"
 
 ASpartaCharacter::ASpartaCharacter()
 {
@@ -18,11 +21,16 @@ ASpartaCharacter::ASpartaCharacter()
 	CameraComp->SetupAttachment(SpringArmComp, USpringArmComponent::SocketName);
 	CameraComp->bUsePawnControlRotation = false;
 
-	NormalSpeed = 600.0f;
-	SprintSpeedMultiplier = 10.0f;
+	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
+	OverheadWidget->SetupAttachment(GetMesh());
+	OverheadWidget->SetWidgetSpace(EWidgetSpace::Screen);
+
+	NormalSpeed = 500.0f;
+	SprintSpeedMultiplier = 3.0f;
 	SprintSpeed = NormalSpeed * SprintSpeedMultiplier;
 
-	GetCharacterMovement()->MaxWalkSpeed = NormalSpeed;
+	MaxHealth = 100.0f;
+	CurrentHealth = MaxHealth;
 }
 
 void ASpartaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -90,6 +98,17 @@ void ASpartaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 }
 
+void ASpartaCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	UpdateOverheadHP();
+
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->MaxWalkSpeed = NormalSpeed;
+	}
+}
+
 void ASpartaCharacter::Move(const FInputActionValue& value)
 {
 	if (!Controller) return;
@@ -131,7 +150,6 @@ void ASpartaCharacter::StartSprint(const FInputActionValue& value)
 {
 	if (GetCharacterMovement())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SprintSpeed: %f"), SprintSpeed)
 		GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
 	}
 }
@@ -139,7 +157,60 @@ void ASpartaCharacter::StopSprint(const FInputActionValue& value)
 {
 	if (GetCharacterMovement())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("NormalSpeed: %f"), NormalSpeed)
 		GetCharacterMovement()->MaxWalkSpeed = NormalSpeed;
+	}
+}
+
+float ASpartaCharacter::GetHealth() const
+{
+	return CurrentHealth;
+}
+
+float ASpartaCharacter::TakeDamage(
+	float DamageAmount,
+	struct FDamageEvent const& DamageEvent,
+	AController* EventInstigator,
+	AActor* DamageCauser)
+{
+	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.0f, MaxHealth);
+	UpdateOverheadHP();
+	UE_LOG(LogTemp, Warning, TEXT("Health decreased to: %f"), CurrentHealth);
+
+	if (CurrentHealth <= 0.0f)
+	{
+		OnDeath();
+	}
+
+	return ActualDamage;
+}
+
+void ASpartaCharacter::AddHealth(float Amount)
+{
+	CurrentHealth = FMath::Clamp(CurrentHealth + Amount, 0.0f, MaxHealth);
+	UpdateOverheadHP();
+	UE_LOG(LogTemp, Warning, TEXT("Health increased to: %f"), CurrentHealth);
+}
+
+void ASpartaCharacter::OnDeath()
+{
+	ASpartaGameState* SpartaGameState = GetWorld() ? GetWorld()->GetGameState<ASpartaGameState>() : nullptr;
+	if (SpartaGameState)
+	{
+		SpartaGameState->OnGameOver();
+	}
+}
+
+void ASpartaCharacter::UpdateOverheadHP()
+{
+	if (!OverheadWidget) return;
+
+	UUserWidget* OverheadWidgetInstance = OverheadWidget->GetUserWidgetObject();
+	if (!OverheadWidgetInstance) return;
+
+	if (UTextBlock* HPText = Cast<UTextBlock>(OverheadWidgetInstance->GetWidgetFromName(TEXT("OverHeadHP"))))
+	{
+		HPText->SetText(FText::FromString(FString::Printf(TEXT("%.0f / %.0f"), CurrentHealth, MaxHealth)));
 	}
 }

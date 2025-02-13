@@ -11,9 +11,11 @@ ASpartaPawn::ASpartaPawn()
 
 	CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
 	SetRootComponent(CapsuleComp);
+	CapsuleComp->SetSimulatePhysics(false);
 
 	SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
 	SkeletalMeshComp->SetupAttachment(CapsuleComp);
+	SkeletalMeshComp->SetSimulatePhysics(false);
 
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	SpringArmComp->SetupAttachment(CapsuleComp);

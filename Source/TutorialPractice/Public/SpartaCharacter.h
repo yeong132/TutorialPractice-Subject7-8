@@ -6,6 +6,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class UWidgetComponent;
 struct FInputActionValue;
 
 UCLASS()
@@ -20,9 +21,27 @@ public:
 	USpringArmComponent* SpringArmComp;
 	UPROPERTY(VisibleAnywhere, BlueprintReadonly, Category="Camera")
 	UCameraComponent* CameraComp;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	UWidgetComponent* OverheadWidget;
+
+	UFUNCTION(BlueprintPure, Category = "health")
+	float GetHealth() const;
+	UFUNCTION(BlueprintCallable, Category = "health")
+	void AddHealth(float amount);
 
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "health")
+	float MaxHealth;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "health")
+	float CurrentHealth;
+
+	virtual void BeginPlay();
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual float TakeDamage(
+		float DamageAmount,
+		struct FDamageEvent const& DamageEvent,
+		AController* EventInstigator,
+		AActor* DamageCauser) override;
 
 	UFUNCTION()
 	void Move(const FInputActionValue& value);
@@ -36,6 +55,9 @@ protected:
 	void StartSprint(const FInputActionValue& value);
 	UFUNCTION()
 	void StopSprint(const FInputActionValue& value);
+
+	void OnDeath();
+	void UpdateOverheadHP();
 
 private:
 	float NormalSpeed;
